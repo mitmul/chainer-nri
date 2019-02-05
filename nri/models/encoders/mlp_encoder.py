@@ -51,9 +51,9 @@ class MLPEncoder(chainer.Chain):
         return edges
 
     def forward(self, inputs, rel_send, rel_rec):
-        # Input shape: [batch_size, num_nodes, num_timesteps, num_dims]
+        # Input shape: [batch_size, num_nodes, num_timesteps, feature_dim]
         x = inputs.reshape(inputs.shape[0], inputs.shape[1], -1)
-        # New shape: [batch_size, num_nodes, num_timesteps * num_dims]
+        # New shape: [batch_size, num_nodes, num_timesteps * feature_dim]
 
         # Obtain embeddings
         x = self.mlp1(x)  # 2-layer ELU net per node
@@ -72,12 +72,12 @@ class MLPEncoder(chainer.Chain):
             x = F.concat((x, x_skip), axis=2)  # Skip connection
             x = self.mlp4(x)
 
-        # x shape: [batch_size, num_nodes * num_dims, n_hid]
+        # x shape: [batch_size, num_nodes * feature_dim, n_hid]
         x = x.reshape(x.shape[0] * x.shape[1], x.shape[2])
-        # x shape: [batch_size * num_nodes * num_dims, n_hid]
+        # x shape: [batch_size * num_nodes * feature_dim, n_hid]
         x = self.fc_out(x)
-        # x shape: [batch_size * num_nodes * num_dims, n_out]
+        # x shape: [batch_size * num_nodes * feature_dim, n_out]
         x = x.reshape(inputs.shape[0], -1, x.shape[1])
-        # x shape: [batch_size, num_nodes * num_dims, n_out]
+        # x shape: [batch_size, num_nodes * feature_dim, n_out]
 
         return x
