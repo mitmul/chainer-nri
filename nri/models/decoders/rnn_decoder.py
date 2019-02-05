@@ -1,3 +1,5 @@
+import logging
+
 import chainer
 import chainer.functions as F
 import chainer.links as L
@@ -10,33 +12,32 @@ class RNNDecoder(chainer.Chain):
 
     def __init__(self, n_in_node, edge_types, n_hid, do_prob=0., skip_first=False):
         super(RNNDecoder, self).__init__()
-
-        self.msg_fc1 = chainer.ChainList(
-            [L.Linear(2 * n_hid, n_hid) for _ in range(edge_types)])
-        self.msg_fc2 = chainer.ChainList(
-            [L.Linear(n_hid, n_hid) for _ in range(edge_types)])
+        self.dropout_prob = do_prob
         self.msg_out_shape = n_hid
         self.skip_first_edge_type = skip_first
 
-        self.hidden_r = L.Linear(n_hid, n_hid, bias=False)
-        self.hidden_i = L.Linear(n_hid, n_hid, bias=False)
-        self.hidden_h = L.Linear(n_hid, n_hid, bias=False)
+        with self.init_scope():
+            self.msg_fc1 = chainer.ChainList(
+                [L.Linear(2 * n_hid, n_hid) for _ in range(edge_types)])
+            self.msg_fc2 = chainer.ChainList(
+                [L.Linear(n_hid, n_hid) for _ in range(edge_types)])
 
-        self.input_r = L.Linear(n_in_node, n_hid, bias=True)
-        self.input_i = L.Linear(n_in_node, n_hid, bias=True)
-        self.input_n = L.Linear(n_in_node, n_hid, bias=True)
+            self.hidden_r = L.Linear(n_hid, n_hid, nobias=True)
+            self.hidden_i = L.Linear(n_hid, n_hid, nobias=True)
+            self.hidden_h = L.Linear(n_hid, n_hid, nobias=True)
 
-        self.out_fc1 = L.Linear(n_hid, n_hid)
-        self.out_fc2 = L.Linear(n_hid, n_hid)
-        self.out_fc3 = L.Linear(n_hid, n_in_node)
+            self.input_r = L.Linear(n_in_node, n_hid, nobias=True)
+            self.input_i = L.Linear(n_in_node, n_hid, nobias=True)
+            self.input_n = L.Linear(n_in_node, n_hid, nobias=True)
 
-        print('Using learned recurrent interaction net decoder.')
+            self.out_fc1 = L.Linear(n_hid, n_hid)
+            self.out_fc2 = L.Linear(n_hid, n_hid)
+            self.out_fc3 = L.Linear(n_hid, n_in_node)
 
-        self.dropout_prob = do_prob
+        logger = logging.getLogger(__name__)
+        logger.info('Using learned recurrent interaction net decoder.')
 
-    def single_step_forward(self, inputs, rel_rec, rel_send,
-                            rel_type, hidden):
-
+    def single_step_forward(self, inputs, rel_rec, rel_send, rel_type, hidden):
         # node2edge
         receivers = F.matmul(rel_rec, hidden)
         senders = F.matmul(rel_send, hidden)
@@ -81,24 +82,19 @@ class RNNDecoder(chainer.Chain):
 
         return pred, hidden
 
-    def forward(self, data, rel_type, rel_rec, rel_send, pred_steps=1,
-                burn_in=False, burn_in_steps=1, dynamic_graph=False,
-                encoder=None, temp=None):
+    def forward(self, data, rel_type, rel_rec, rel_send, pred_steps=1, burn_in=False, burn_in_steps=1,
+                dynamic_graph=False, encoder=None, temp=None):
+        # NOTE: Assumes that we have the same graph across all samples.
 
-        inputs = data.transpose(1, 2).contiguous()
+        # data: [batch_size, num_nodes, timesteps, feature_dim]
+        batch_size, num_nodes, timesteps, feature_dim = data.shape
+        inputs = F.transpose(data, (batch_size, timesteps, num_nodes, feature_dim))
 
-        time_steps = inputs.size(1)
-
-        # inputs has shape
-        # [batch_size, num_timesteps, num_atoms, num_dims]
-
-        # rel_type has shape:
-        # [batch_size, num_atoms*(num_atoms-1), num_edge_types]
+        # rel_type: [batch_size, num_edges, edge_types]
+        _, num_edges, edge_types = rel_type.shape
 
         hidden = Variable(
-            torch.zeros(inputs.size(0), inputs.size(2), self.msg_out_shape))
-        if inputs.is_cuda:
-            hidden = hidden.cuda()
+            data.xp.zeros(batch_size, num_nodes, self.msg_out_shape))
 
         pred_all = []
 

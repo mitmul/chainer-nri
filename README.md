@@ -44,14 +44,16 @@ python utils/visualize_results.py \
 
 ### Accuracy (in %) of unsupervised interaction recovery
 
-Model                 | Springs - 5 nodes (test) |
-:---------------------|:-------------------------|
-This implementation   | 99.8                     |
-Original (from paper) | 99.9                     |
+| Model                                  | Springs - 5 nodes (test) |
+|:---------------------------------------|:-------------------------|
+| chainer-nri (MLPEncoder, MLPDecoder)   | 99.8                     |
+| chainer-nri (CNNEncoder, MLPDecoder)   | 99.4                     |
+| Original (from paper)                  | 99.9                     |
 
 ### Mean squared error (MSE) in predicting future states for simulations with 5 nodes
 
-Model                 | Springs - 5 nodes (test) |
-:---------------------|:-------------------------|
-This implementation   | 3.75e-05                 |
-Original (from paper) | 3.12e-8                  |
+| Model                                  | Springs - 5 nodes (test) |
+|:---------------------------------------|:-------------------------|
+| chainer-nri (MLPEncoder, MLPDecoder)   | 3.75e-05                 |
+| chainer-nri (CNNEncoder, MLPDecoder)   | 3.83e-05                 |
+| Original (from paper)                  | 3.12e-08                 |
